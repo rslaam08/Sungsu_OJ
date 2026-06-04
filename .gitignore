@@ -1,0 +1,27 @@
+# Build output
+build/
+*.exe
+*.o
+*.obj
+
+# Runtime data files
+data/users.dat
+data/problems.dat
+data/submissions.dat
+data/promotions.dat
+
+# Judge workspace outputs
+workspace/sources/*
+workspace/executables/*
+workspace/outputs/*
+workspace/errors/*
+
+# Keep workspace folders
+!workspace/sources/.gitkeep
+!workspace/executables/.gitkeep
+!workspace/outputs/.gitkeep
+!workspace/errors/.gitkeep
+
+# Windows
+Thumbs.db
+Desktop.ini
