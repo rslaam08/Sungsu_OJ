@@ -211,6 +211,7 @@ void menu_problem_list(void) {
             continue;
         } else {
             printf("잘못된 입력입니다.\n");
+            continue;
         }
 
         printf("\n상세히 볼 문제 ID를 입력하세요. 뒤로 가려면 0 > ");
