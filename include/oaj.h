@@ -199,6 +199,8 @@ void        get_current_timestamp(char* buf, int buf_size);
 Tier        score_to_tier(int score);
 const char* tier_to_string(Tier tier);
 const char* judge_result_to_string(JudgeResult result);
+const char* judge_result_to_display(JudgeResult result);
+const char* judge_result_code_to_display(const char* result_code);
 const char* promo_status_to_string(PromoStatus status);
 int         get_tier_threshold(Tier tier);
 void        clear_screen(void);
@@ -272,6 +274,10 @@ int  compare_by_tier(const User* a, const User* b);
 
 /* promotion.c */
 int check_promotion_condition(const User* user);
+int get_promotion_min_difficulty(Tier tier);
+int get_promotion_max_difficulty(Tier tier);
+const char* get_promotion_pool_description(Tier tier);
+int count_promotion_candidates(const User* user);
 int start_promotion(User* user, PromotionExam* out_exam);
 int check_promotion_time(const PromotionExam* exam);
 int submit_promotion_source(PromotionExam* exam, User* user,
