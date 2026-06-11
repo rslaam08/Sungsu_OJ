@@ -65,6 +65,13 @@ static int compare_problem_difficulty(const void* a, const void* b) {
     return pa->problem_id - pb->problem_id;
 }
 
+static const char* solved_marker(int problem_id) {
+    if (g_current_user != NULL && has_user_solved_problem(g_current_user->user_id, problem_id)) {
+        return "[v] ";
+    }
+    return "    ";
+}
+
 void list_problems(int sort_by_difficulty) {
     if (g_problem_count == 0) {
         printf("등록된 문제가 없습니다.\n");
@@ -86,7 +93,7 @@ void list_problems(int sort_by_difficulty) {
     print_separator();
 
     for (int i = 0; i < g_problem_count; i++) {
-        printf("[%d] %s\n", tmp[i].problem_id, tmp[i].title);
+        printf("%s[%d] %s\n", solved_marker(tmp[i].problem_id), tmp[i].problem_id, tmp[i].title);
         printf("     난이도: %d | 카테고리: %s\n",
                tmp[i].difficulty, tmp[i].category);
         printf("     정답률: %.2f%% | 제출: %d\n",
@@ -111,8 +118,8 @@ void search_problem_by_title(const char* keyword) {
                 printf("검색 결과\n");
                 print_separator();
             }
-            printf("[%d] %s (난이도 %d, %s)\n", g_problems[i].problem_id,
-                   g_problems[i].title, g_problems[i].difficulty, g_problems[i].category);
+            printf("%s[%d] %s (난이도 %d, %s)\n", solved_marker(g_problems[i].problem_id),
+                   g_problems[i].problem_id, g_problems[i].title, g_problems[i].difficulty, g_problems[i].category);
             found = 1;
         }
     }
@@ -129,8 +136,8 @@ void search_problem_by_category(const char* category) {
                 printf("검색 결과\n");
                 print_separator();
             }
-            printf("[%d] %s (난이도 %d, %s)\n", g_problems[i].problem_id,
-                   g_problems[i].title, g_problems[i].difficulty, g_problems[i].category);
+            printf("%s[%d] %s (난이도 %d, %s)\n", solved_marker(g_problems[i].problem_id),
+                   g_problems[i].problem_id, g_problems[i].title, g_problems[i].difficulty, g_problems[i].category);
             found = 1;
         }
     }

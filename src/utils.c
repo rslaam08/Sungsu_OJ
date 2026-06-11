@@ -39,6 +39,27 @@ const char* judge_result_to_string(JudgeResult result) {
     }
 }
 
+const char* judge_result_to_display(JudgeResult result) {
+    switch (result) {
+        case JUDGE_AC:  return "AC(ACCEPTED)";
+        case JUDGE_WA:  return "WA(WRONG ANSWER)";
+        case JUDGE_TLE: return "TLE(TIME LIMIT EXCEEDED)";
+        case JUDGE_RE:  return "RE(RUNTIME ERROR)";
+        case JUDGE_CE:  return "CE(COMPILE ERROR)";
+        default:        return "UNKNOWN";
+    }
+}
+
+const char* judge_result_code_to_display(const char* result_code) {
+    if (result_code == NULL) return "UNKNOWN";
+    if (strcmp(result_code, "AC") == 0)  return "AC(ACCEPTED)";
+    if (strcmp(result_code, "WA") == 0)  return "WA(WRONG ANSWER)";
+    if (strcmp(result_code, "TLE") == 0) return "TLE(TIME LIMIT EXCEEDED)";
+    if (strcmp(result_code, "RE") == 0)  return "RE(RUNTIME ERROR)";
+    if (strcmp(result_code, "CE") == 0)  return "CE(COMPILE ERROR)";
+    return result_code;
+}
+
 const char* promo_status_to_string(PromoStatus status) {
     switch (status) {
         case PROMO_IDLE:    return "IDLE";

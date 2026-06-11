@@ -120,9 +120,29 @@ int submit_source(User* user, int problem_id, const char* source_file) {
     const char* result_text = judge_result_to_string(result);
 
     int score_earned = 0;
+    int raw_score_earned = 0;
+    int score_was_capped = 0;
+    int tier_cap = 0;
+
     if (result == JUDGE_AC && !already_solved) {
-        score_earned = calculate_score(p->difficulty, time_taken, attempts, get_score_func(g_score_mode));
-        update_user_score(user, score_earned);
+        raw_score_earned = calculate_score(p->difficulty, time_taken, attempts, get_score_func(g_score_mode));
+        score_earned = raw_score_earned;
+
+        /* 승급전 조건 점수에 도달하면, 승급 전까지 현재 티어의 최고점을 넘지 못한다. */
+        if (user->tier < TIER_CHALLENGER) {
+            tier_cap = get_tier_threshold((Tier)user->tier);
+            if (user->score >= tier_cap) {
+                score_earned = 0;
+                score_was_capped = 1;
+            } else if (user->score + score_earned > tier_cap) {
+                score_earned = tier_cap - user->score;
+                score_was_capped = 1;
+            }
+        }
+
+        if (score_earned > 0) {
+            update_user_score(user, score_earned);
+        }
         user->solved_count++;
         p->correct_count++;
     }
@@ -146,12 +166,26 @@ int submit_source(User* user, int problem_id, const char* source_file) {
     save_users();
     save_problems();
 
-    printf("\n채점 결과: %s\n", result_text);
+    printf("\n채점 결과: %s\n", judge_result_to_display(result));
     printf("실행 시간: 약 %d초\n", time_taken);
     printf("시도 횟수: %d회\n", attempts);
     if (result == JUDGE_AC) {
-        if (already_solved) printf("이미 맞힌 문제라 추가 점수는 없습니다.\n");
-        else printf("획득 점수: %d점\n", score_earned);
+        if (already_solved) {
+            printf("이미 맞힌 문제라 추가 점수는 없습니다.\n");
+        } else {
+            if (score_was_capped) {
+                printf("원래 획득 예정 점수: %d점\n", raw_score_earned);
+                if (tier_cap > 0 && score_earned > 0) {
+                    printf("[안내] 현재 티어의 최고점은 %d점입니다. 승급전을 통과해야 점수를 더 올릴 수 있습니다.\n", tier_cap);
+                    printf("점수 제한으로 실제 획득 점수: %d점\n", score_earned);
+                } else if (tier_cap > 0) {
+                    printf("[안내] 이미 승급전 조건 점수(%d점)에 도달했습니다. 승급전을 진행하기 전까지 추가 점수를 얻을 수 없습니다.\n", tier_cap);
+                    printf("점수 제한으로 실제 획득 점수: 0점\n");
+                }
+            } else {
+                printf("획득 점수: %d점\n", score_earned);
+            }
+        }
     } else if (result == JUDGE_CE) {
         printf("컴파일 오류 로그: %s/sub_%d_compile.txt\n", DIR_ERRORS, submission_id);
     }
@@ -162,14 +196,14 @@ int submit_source(User* user, int problem_id, const char* source_file) {
 void print_submission_history(int user_id) {
     int found = 0;
     print_separator();
-    printf("%-6s %-8s %-8s %-8s %-8s %-20s\n", "제출ID", "문제ID", "결과", "시간", "점수", "시각");
+    printf("%-6s %-8s %-25s %-8s %-8s %-20s\n", "제출ID", "문제ID", "결과", "시간", "점수", "시각");
     print_separator();
     for (int i = 0; i < g_submission_count; i++) {
         if (g_submissions[i].user_id == user_id) {
-            printf("%-6d %-8d %-8s %-8d %-8d %-20s\n",
+            printf("%-6d %-8d %-25s %-8d %-8d %-20s\n",
                    g_submissions[i].submission_id,
                    g_submissions[i].problem_id,
-                   g_submissions[i].result,
+                   judge_result_code_to_display(g_submissions[i].result),
                    g_submissions[i].time_taken,
                    g_submissions[i].score_earned,
                    g_submissions[i].timestamp);
