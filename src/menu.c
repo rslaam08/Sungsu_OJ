@@ -1,9 +1,11 @@
 #include "oaj.h"
 #include <ctype.h>
+#include <stdint.h>
 
 #ifdef _WIN32
 #include <conio.h>
 #include <windows.h>
+#include <process.h>
 #endif
 
 static void read_line(const char* prompt, char* buf, int size) {
@@ -262,6 +264,202 @@ static void render_promotion_problem(void* raw_ctx, int remaining) {
     print_separator();
 }
 
+
+typedef struct {
+    PromotionExam* exam;
+    User* user;
+    int problem_index;
+    char source_file[MAX_FILEPATH_LEN];
+    int ret;
+    JudgeResult result;
+    int time_taken;
+    int newly_solved;
+    int old_promotion_passed;
+    int old_solved[PROMOTION_PROBLEM_COUNT];
+    int done;
+} PromotionSubmitCtx;
+
+static void render_promotion_submit_status(void* raw_ctx, int remaining) {
+    PromotionSubmitCtx* ctx = (PromotionSubmitCtx*)raw_ctx;
+    Problem* p = NULL;
+    int problem_id = 0;
+
+    if (ctx && ctx->exam && ctx->problem_index >= 0 && ctx->problem_index < PROMOTION_PROBLEM_COUNT) {
+        problem_id = ctx->exam->problem_ids[ctx->problem_index];
+        p = find_problem_by_id(problem_id);
+    }
+
+    clear_screen();
+    print_promotion_time_line(remaining, g_current_user);
+    printf("승급전 채점 화면\n");
+    print_separator();
+    printf("문제: %d - %s\n", problem_id, p ? p->title : "문제 정보 없음");
+    printf("제출 파일: %s\n", ctx ? ctx->source_file : "");
+    print_separator();
+
+    if (ctx == NULL || !ctx->done) {
+        printf("채점 중입니다. 남은 시간은 계속 갱신됩니다.\n");
+        printf("컴파일 또는 큰 테스트케이스 실행 중에는 잠시 걸릴 수 있습니다.\n");
+        return;
+    }
+
+    if (ctx->ret == ERR_FILE_OPEN) {
+        printf("[오류] 파일을 찾지 못했습니다: %s\n", ctx->source_file);
+    } else if (ctx->ret == ERR_TIME_OVER) {
+        printf("[시간 초과] 승급전 제한 시간이 지났습니다.\n");
+    } else if (ctx->ret != ERR_NONE) {
+        printf("[오류] 승급전 제출 실패. 코드: %d\n", ctx->ret);
+    } else {
+        printf("채점 결과: %s\n", judge_result_to_display(ctx->result));
+        printf("실행 시간: 약 %d초\n", ctx->time_taken);
+        printf("승급전 제출은 점수, 정답률, 제출 이력에 반영되지 않습니다.\n");
+        if (ctx->result == JUDGE_AC) {
+            if (ctx->newly_solved) {
+                printf("승급전 통과 문제: %d / %d\n",
+                       ctx->user ? ctx->user->promotion_passed : 0,
+                       PROMOTION_PASS_COUNT);
+            } else {
+                printf("이미 맞힌 승급전 문제입니다.\n");
+            }
+        }
+    }
+}
+
+#ifdef _WIN32
+static unsigned __stdcall promotion_submit_worker(void* raw_ctx) {
+    PromotionSubmitCtx* ctx = (PromotionSubmitCtx*)raw_ctx;
+    ctx->ret = submit_promotion_source_silent(ctx->exam, ctx->user,
+                                              ctx->problem_index, ctx->source_file,
+                                              &ctx->result, &ctx->time_taken,
+                                              &ctx->newly_solved);
+    ctx->done = 1;
+    return 0;
+}
+#endif
+
+static int wait_enter_with_timer(PromotionExam* exam,
+                                 PromotionRenderFunc render,
+                                 void* ctx,
+                                 const char* prompt) {
+#ifdef _WIN32
+    time_t last_draw = 0;
+    while (1) {
+        int remaining = check_promotion_time(exam);
+        if (remaining == ERR_TIME_OVER) return ERR_TIME_OVER;
+
+        time_t now = time(NULL);
+        if (now != last_draw) {
+            render(ctx, remaining);
+            printf("%s", prompt ? prompt : "계속하려면 Enter를 누르세요...");
+            fflush(stdout);
+            last_draw = now;
+        }
+
+        if (_kbhit()) {
+            int ch = _getch();
+            if (ch == 0 || ch == 224) {
+                if (_kbhit()) _getch();
+                continue;
+            }
+            if (ch == '\r' || ch == '\n') {
+                printf("\n");
+                return ERR_NONE;
+            }
+        }
+        Sleep(50);
+    }
+#else
+    int remaining = check_promotion_time(exam);
+    if (remaining == ERR_TIME_OVER) return ERR_TIME_OVER;
+    render(ctx, remaining);
+    printf("%s", prompt ? prompt : "계속하려면 Enter를 누르세요...");
+    getchar();
+    return ERR_NONE;
+#endif
+}
+
+static int run_promotion_submission_with_timer(PromotionExam* exam,
+                                               PromotionProblemCtx* problem_ctx,
+                                               const char* source_file) {
+    PromotionSubmitCtx submit_ctx;
+    memset(&submit_ctx, 0, sizeof(submit_ctx));
+    submit_ctx.exam = exam;
+    submit_ctx.user = g_current_user;
+    submit_ctx.problem_index = problem_ctx ? problem_ctx->index : -1;
+    submit_ctx.ret = ERR_NONE;
+    submit_ctx.result = JUDGE_RE;
+    submit_ctx.old_promotion_passed = g_current_user ? g_current_user->promotion_passed : 0;
+    if (exam != NULL) {
+        for (int i = 0; i < PROMOTION_PROBLEM_COUNT; i++) {
+            submit_ctx.old_solved[i] = exam->solved[i];
+        }
+    }
+    strncpy(submit_ctx.source_file, source_file ? source_file : "", MAX_FILEPATH_LEN - 1);
+
+#ifdef _WIN32
+    uintptr_t th = _beginthreadex(NULL, 0, promotion_submit_worker, &submit_ctx, 0, NULL);
+    if (th == 0) {
+        submit_ctx.ret = submit_promotion_source_silent(exam, g_current_user,
+                                                        submit_ctx.problem_index,
+                                                        submit_ctx.source_file,
+                                                        &submit_ctx.result,
+                                                        &submit_ctx.time_taken,
+                                                        &submit_ctx.newly_solved);
+        submit_ctx.done = 1;
+    } else {
+        HANDLE handle = (HANDLE)th;
+        time_t last_draw = 0;
+        while (WaitForSingleObject(handle, 50) == WAIT_TIMEOUT) {
+            int remaining = check_promotion_time(exam);
+            if (remaining == ERR_TIME_OVER) {
+                render_promotion_submit_status(&submit_ctx, 0);
+                printf("승급전 시간이 종료되었습니다. 진행 중인 채점이 끝나면 실패 처리됩니다.\n");
+                fflush(stdout);
+                WaitForSingleObject(handle, INFINITE);
+                CloseHandle(handle);
+                if (g_current_user) g_current_user->promotion_passed = submit_ctx.old_promotion_passed;
+                if (exam != NULL) {
+                    for (int i = 0; i < PROMOTION_PROBLEM_COUNT; i++) {
+                        exam->solved[i] = submit_ctx.old_solved[i];
+                    }
+                }
+                submit_ctx.ret = ERR_TIME_OVER;
+                submit_ctx.done = 1;
+                return ERR_TIME_OVER;
+            }
+            time_t now = time(NULL);
+            if (now != last_draw) {
+                render_promotion_submit_status(&submit_ctx, remaining);
+                fflush(stdout);
+                last_draw = now;
+            }
+        }
+        WaitForSingleObject(handle, INFINITE);
+        CloseHandle(handle);
+    }
+#else
+    submit_ctx.ret = submit_promotion_source_silent(exam, g_current_user,
+                                                    submit_ctx.problem_index,
+                                                    submit_ctx.source_file,
+                                                    &submit_ctx.result,
+                                                    &submit_ctx.time_taken,
+                                                    &submit_ctx.newly_solved);
+    submit_ctx.done = 1;
+#endif
+
+    int remaining = check_promotion_time(exam);
+    if (remaining == ERR_TIME_OVER) {
+        render_promotion_submit_status(&submit_ctx, 0);
+        return ERR_TIME_OVER;
+    }
+
+    int wait_ret = wait_enter_with_timer(exam, render_promotion_submit_status,
+                                         &submit_ctx,
+                                         "계속하려면 Enter를 누르세요...");
+    if (wait_ret == ERR_TIME_OVER) return ERR_TIME_OVER;
+    return submit_ctx.ret;
+}
+
 static int menu_promotion_problem_detail(PromotionExam* exam, int start_index) {
     if (exam == NULL) return 0;
 
@@ -282,21 +480,12 @@ static int menu_promotion_problem_detail(PromotionExam* exam, int start_index) {
                                        "제출할 .c 파일 경로: ", source_file, sizeof(source_file));
             if (ret == ERR_TIME_OVER) return ERR_TIME_OVER;
 
-            clear_screen();
-            print_promotion_time_line(check_promotion_time(exam), g_current_user);
-            int submit_ret = submit_promotion_source(exam, g_current_user, ctx.index, source_file);
+            int submit_ret = run_promotion_submission_with_timer(exam, &ctx, source_file);
             if (submit_ret == ERR_TIME_OVER) return ERR_TIME_OVER;
-            if (submit_ret == ERR_FILE_OPEN) {
-                printf("[오류] 파일을 찾지 못했습니다: %s\n", source_file);
-            } else if (submit_ret != ERR_NONE) {
-                printf("[오류] 승급전 제출 실패. 코드: %d\n", submit_ret);
-            }
 
             if (g_current_user && g_current_user->promotion_passed >= PROMOTION_PASS_COUNT) {
-                press_enter_to_continue();
                 return 1; /* 성공 조건 달성 */
             }
-            press_enter_to_continue();
         } else if (choice == 2) {
             int target = -1;
             ret = read_int_with_timer(exam, render_promotion_problem, &ctx,
@@ -310,7 +499,9 @@ static int menu_promotion_problem_detail(PromotionExam* exam, int start_index) {
                 ctx.index = target_index;
             } else {
                 printf("[오류] 해당 승급전 문제를 찾지 못했습니다.\n");
-                press_enter_to_continue();
+                ret = wait_enter_with_timer(exam, render_promotion_problem, &ctx,
+                                            "계속하려면 Enter를 누르세요...");
+                if (ret == ERR_TIME_OVER) return ERR_TIME_OVER;
             }
         }
     }
@@ -662,10 +853,19 @@ void menu_promotion(void) {
         press_enter_to_continue();
         return;
     }
-    press_enter_to_continue();
 
     PromotionListCtx list_ctx;
     list_ctx.exam = &exam;
+
+    ret = wait_enter_with_timer(&exam, render_promotion_list, &list_ctx,
+                                "승급전이 시작되었습니다. 계속하려면 Enter를 누르세요...");
+    if (ret == ERR_TIME_OVER) {
+        clear_screen();
+        printf("[시간 초과] 승급전이 종료됩니다.\n");
+        finish_promotion(&exam, g_current_user);
+        press_enter_to_continue();
+        return;
+    }
 
     while (1) {
         if (g_current_user->promotion_passed >= PROMOTION_PASS_COUNT) {
@@ -711,7 +911,15 @@ void menu_promotion(void) {
             }
         } else {
             printf("[오류] 해당 승급전 문제를 찾지 못했습니다.\n");
-            press_enter_to_continue();
+            ret = wait_enter_with_timer(&exam, render_promotion_list, &list_ctx,
+                                        "계속하려면 Enter를 누르세요...");
+            if (ret == ERR_TIME_OVER) {
+                clear_screen();
+                printf("[시간 초과] 승급전이 종료됩니다.\n");
+                finish_promotion(&exam, g_current_user);
+                press_enter_to_continue();
+                return;
+            }
         }
     }
 }

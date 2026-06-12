@@ -284,6 +284,11 @@ int start_promotion(User* user, PromotionExam* out_exam);
 int check_promotion_time(const PromotionExam* exam);
 int submit_promotion_source(PromotionExam* exam, User* user,
                             int problem_index, const char* source_file);
+int submit_promotion_source_silent(PromotionExam* exam, User* user,
+                                   int problem_index, const char* source_file,
+                                   JudgeResult* out_result,
+                                   int* out_time_taken,
+                                   int* out_newly_solved);
 int finish_promotion(PromotionExam* exam, User* user);
 
 /* menu.c */

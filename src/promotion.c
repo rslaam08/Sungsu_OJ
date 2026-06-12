@@ -286,33 +286,63 @@ int check_promotion_time(const PromotionExam* exam) {
     return remaining;
 }
 
-int submit_promotion_source(PromotionExam* exam, User* user,
-                            int problem_index, const char* source_file) {
+int submit_promotion_source_silent(PromotionExam* exam, User* user,
+                                   int problem_index, const char* source_file,
+                                   JudgeResult* out_result,
+                                   int* out_time_taken,
+                                   int* out_newly_solved) {
+    if (out_result) *out_result = JUDGE_RE;
+    if (out_time_taken) *out_time_taken = 0;
+    if (out_newly_solved) *out_newly_solved = 0;
+
     if (exam == NULL || user == NULL || source_file == NULL) return ERR_NULL_PTR;
     if (problem_index < 0 || problem_index >= PROMOTION_PROBLEM_COUNT) return ERR_INVALID_INPUT;
-    if (!file_exists(source_file)) {
-        return ERR_FILE_OPEN;
-    }
+    if (!file_exists(source_file)) return ERR_FILE_OPEN;
 
     int remaining = check_promotion_time(exam);
-    if (remaining == ERR_TIME_OVER) {
-        printf("[시간 초과] 승급전이 실패 처리됩니다.\n");
-        return ERR_TIME_OVER;
-    }
+    if (remaining == ERR_TIME_OVER) return ERR_TIME_OVER;
 
     int problem_id = exam->problem_ids[problem_index];
     int submission_id = (int)time(NULL) + problem_index + 1000000;
     int time_taken = 0;
     JudgeResult result = judge_source(problem_id, source_file, submission_id, &time_taken);
 
-    printf("채점 결과: %s\n", judge_result_to_display(result));
-    printf("실행 시간: 약 %d초\n", time_taken);
-    printf("승급전 제출은 점수, 정답률, 제출 이력에 반영되지 않습니다.\n");
+    if (out_result) *out_result = result;
+    if (out_time_taken) *out_time_taken = time_taken;
 
     if (result == JUDGE_AC && exam->solved[problem_index] == 0) {
         exam->solved[problem_index] = 1;
         user->promotion_passed++;
-        printf("승급전 통과 문제: %d / %d\n", user->promotion_passed, PROMOTION_PASS_COUNT);
+        if (out_newly_solved) *out_newly_solved = 1;
+    }
+
+    return ERR_NONE;
+}
+
+int submit_promotion_source(PromotionExam* exam, User* user,
+                            int problem_index, const char* source_file) {
+    JudgeResult result = JUDGE_RE;
+    int time_taken = 0;
+    int newly_solved = 0;
+
+    int ret = submit_promotion_source_silent(exam, user, problem_index, source_file,
+                                             &result, &time_taken, &newly_solved);
+    if (ret == ERR_TIME_OVER) {
+        printf("[시간 초과] 승급전이 실패 처리됩니다.\n");
+        return ret;
+    }
+    if (ret != ERR_NONE) return ret;
+
+    printf("채점 결과: %s\n", judge_result_to_display(result));
+    printf("실행 시간: 약 %d초\n", time_taken);
+    printf("승급전 제출은 점수, 정답률, 제출 이력에 반영되지 않습니다.\n");
+
+    if (result == JUDGE_AC) {
+        if (newly_solved) {
+            printf("승급전 통과 문제: %d / %d\n", user->promotion_passed, PROMOTION_PASS_COUNT);
+        } else {
+            printf("이미 맞힌 승급전 문제입니다.\n");
+        }
     }
 
     return ERR_NONE;
