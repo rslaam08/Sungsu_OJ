@@ -205,6 +205,8 @@ const char* promo_status_to_string(PromoStatus status);
 int         get_tier_threshold(Tier tier);
 void        clear_screen(void);
 void        print_separator(void);
+int         utf8_display_width(const char* s);
+void        print_padded_utf8(const char* s, int width);
 void        press_enter_to_continue(void);
 int         file_exists(const char* path);
 void        trim_newline(char* s);
@@ -226,9 +228,9 @@ int      add_problem(const char* title, const char* desc,
                      int difficulty, const char* category,
                      int time_limit, int testcase_count);
 Problem* find_problem_by_id(int problem_id);
-void     list_problems(int sort_by_difficulty);
-void     search_problem_by_title(const char* keyword);
-void     search_problem_by_category(const char* category);
+int      list_problems(int sort_by_difficulty);
+int      search_problem_by_title(const char* keyword);
+int      search_problem_by_category(const char* category);
 void     print_problem_detail(const Problem* problem);
 double   get_problem_correct_rate(const Problem* problem);
 int      load_testcases(int problem_id, TestCase** out_cases);

@@ -31,6 +31,30 @@ void sort_users(User* arr, int n, CompareFunc cmp_fn) {
     }
 }
 
+static void print_rank_header(int include_tier, int include_admin) {
+    print_padded_utf8("순위", 6);
+    print_padded_utf8("아이디", 18);
+    if (include_tier) print_padded_utf8("티어", 15);
+    print_padded_utf8("점수", 10);
+    print_padded_utf8("푼문제", 10);
+    if (include_admin) print_padded_utf8("관리자", 8);
+    printf("\n");
+}
+
+static void print_rank_row(int rank, const User* user, int include_tier, int include_admin) {
+    char buf[64];
+    snprintf(buf, sizeof(buf), "%d", rank);
+    print_padded_utf8(buf, 6);
+    print_padded_utf8(user->username, 18);
+    if (include_tier) print_padded_utf8(tier_to_string((Tier)user->tier), 15);
+    snprintf(buf, sizeof(buf), "%d", user->score);
+    print_padded_utf8(buf, 10);
+    snprintf(buf, sizeof(buf), "%d", user->solved_count);
+    print_padded_utf8(buf, 10);
+    if (include_admin) print_padded_utf8(user->is_admin ? "O" : "-", 8);
+    printf("\n");
+}
+
 void show_ranking_all(CompareFunc cmp_fn) {
     if (g_user_count == 0) {
         printf("등록된 유저가 없습니다.\n");
@@ -48,12 +72,10 @@ void show_ranking_all(CompareFunc cmp_fn) {
     sort_users(tmp, g_user_count, cmp_fn);
 
     print_separator();
-    printf("%-4s %-15s %-14s %-8s %-8s %-6s\n", "순위", "아이디", "티어", "점수", "푼문제", "관리자");
+    print_rank_header(1, 1);
     print_separator();
     for (int i = 0; i < g_user_count; i++) {
-        printf("%-4d %-15s %-14s %-8d %-8d %-6s\n",
-               i + 1, tmp[i].username, tier_to_string((Tier)tmp[i].tier),
-               tmp[i].score, tmp[i].solved_count, tmp[i].is_admin ? "O" : "-");
+        print_rank_row(i + 1, &tmp[i], 1, 1);
     }
     print_separator();
     free(tmp);
@@ -86,9 +108,10 @@ void show_ranking_by_tier(Tier tier) {
     print_separator();
     printf("[%s] 티어 랭킹\n", tier_to_string(tier));
     print_separator();
-    printf("%-4s %-15s %-8s %-8s\n", "순위", "아이디", "점수", "푼문제");
+    print_rank_header(0, 0);
+    print_separator();
     for (int i = 0; i < count; i++) {
-        printf("%-4d %-15s %-8d %-8d\n", i + 1, tmp[i].username, tmp[i].score, tmp[i].solved_count);
+        print_rank_row(i + 1, &tmp[i], 0, 0);
     }
     print_separator();
     free(tmp);

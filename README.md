@@ -38,48 +38,6 @@ build\soj.exe
 - ID: `admin`
 - PW: `admin123`
 
-## 기본 예시 문제
-
-프로그램 최초 실행 시 `1001 - A+B` 문제가 자동 등록됩니다.
-
-문제 상세 화면에는 다음 세 영역이 표시됩니다.
-
-- 문제 설명: 문제 자체에 대한 설명
-- 입력: 입력값의 형식과 의미
-- 출력: 출력값의 형식과 의미
-
-테스트케이스 위치:
-
-```text
-data/testcases/1001/input1.txt
-data/testcases/1001/output1.txt
-data/testcases/1001/input2.txt
-data/testcases/1001/output2.txt
-data/testcases/1001/input3.txt
-data/testcases/1001/output3.txt
-```
-
-정답 예시 소스:
-
-```text
-examples/answer_1001.c
-```
-
-실행 후 문제 `1001`을 선택하고 제출 파일 경로에 아래를 입력하면 됩니다.
-
-```text
-examples/answer_1001.c
-```
-
-## 채점 방식
-
-1. 사용자가 `.c` 소스 파일 경로를 입력합니다.
-2. SOJ가 제출 파일을 `workspace/sources/user_{id}/sub_{id}.c`로 복사합니다.
-3. `gcc`로 컴파일해 `workspace/executables/sub_{id}.exe`를 만듭니다.
-4. 각 테스트케이스 입력 파일을 실행 파일의 표준 입력으로 넣습니다.
-5. 실행 결과를 `workspace/outputs/`에 저장합니다.
-6. 문제의 정답 출력 파일과 비교합니다.
-7. 결과를 `AC`, `WA`, `TLE`, `RE`, `CE`로 판정합니다.
 
 ## 새 문제 추가 방법
 
@@ -134,23 +92,3 @@ output2.txt
 이 프로젝트는 `data/users.dat`, `data/problems.dat`, `data/submissions.dat`, `data/promotions.dat`에 실행 데이터를 저장합니다.
 Windows에서 `build\soj.exe`를 직접 더블클릭하거나 VSCode 작업 디렉터리가 달라지면 저장 위치가 달라질 수 있으므로, 이 버전은 실행 시 작업 디렉터리를 프로젝트 루트로 자동 보정합니다.
 `reset_data.bat`을 실행하면 저장 데이터가 삭제됩니다.
-
-## 이번 버전의 변경점
-
-- `Problem` 구조체에 `input_desc`, `output_desc` 필드를 추가했습니다.
-- 문제 상세 화면에서 `[문제 설명]`, `[입력]`, `[출력]` 영역을 따로 출력합니다.
-- 관리자 문제 등록 화면에서도 `문제 설명`, `입력`, `출력`을 각각 입력할 수 있습니다.
-- 기존 `problems.dat`가 이전 구조체 형식이면 가능한 경우 새 구조체로 자동 변환하고, 입력/출력 설명은 기본 문구로 채웁니다.
-
-
-## 기본 탑재 문제 세트
-
-이 버전에는 1001번부터 1012번까지 총 12문제가 기본 탑재되어 있습니다.
-
-- `data/problems.dat`: 문제 제목, 설명, 입력 설명, 출력 설명, 난이도, 카테고리, 시간 제한, 테스트케이스 수
-- `data/testcases/{문제번호}/inputN.txt`: 테스트케이스 입력
-- `data/testcases/{문제번호}/outputN.txt`: 테스트케이스 정답 출력
-- `examples/answer_문제번호.c`: 예시 정답 코드
-- `examples/wrong_문제번호.c`: 예시 오답 코드
-
-문제 세트를 완전히 초기화하려면 `data/users.dat`, `data/submissions.dat`, `data/promotions.dat`를 삭제하고, 문제를 바꾸려면 `data/problems.dat`와 `data/testcases/`를 함께 교체하세요.

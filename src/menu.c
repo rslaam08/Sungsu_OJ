@@ -471,38 +471,38 @@ void menu_problem_list(void) {
 
         if (choice == 0) return;
 
+        int selected_problem_id = 0;
+
         if (choice == 1) {
-            list_problems(0);
+            selected_problem_id = list_problems(0);
         } else if (choice == 2) {
-            list_problems(1);
+            selected_problem_id = list_problems(1);
         } else if (choice == 3) {
             char keyword[100];
             read_line("검색할 제목 키워드: ", keyword, sizeof(keyword));
-            search_problem_by_title(keyword);
+            selected_problem_id = search_problem_by_title(keyword);
         } else if (choice == 4) {
             char category[100];
             read_line("검색할 카테고리: ", category, sizeof(category));
-            search_problem_by_category(category);
+            selected_problem_id = search_problem_by_category(category);
         } else if (choice == 5) {
             int problem_id;
             printf("문제 ID 입력 > ");
-            scanf("%d", &problem_id);
-            getchar();
-            menu_problem_detail(problem_id);
-            continue;
+            if (scanf("%d", &problem_id) == 1) {
+                getchar();
+                selected_problem_id = problem_id;
+            } else {
+                scanf("%*s");
+                selected_problem_id = 0;
+            }
         } else {
             printf("잘못된 입력입니다.\n");
             press_enter_to_continue();
             continue;
         }
 
-        printf("\n상세히 볼 문제 ID를 입력하세요. 뒤로 가려면 0 > ");
-        int problem_id;
-        if (scanf("%d", &problem_id) == 1) {
-            getchar();
-            if (problem_id != 0) menu_problem_detail(problem_id);
-        } else {
-            getchar();
+        if (selected_problem_id != 0) {
+            menu_problem_detail(selected_problem_id);
         }
     }
 }

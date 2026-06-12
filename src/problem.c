@@ -72,76 +72,155 @@ static const char* solved_marker(int problem_id) {
     return "    ";
 }
 
-void list_problems(int sort_by_difficulty) {
+#define PROBLEM_PAGE_SIZE 10
+
+static void print_problem_summary(const Problem* problem) {
+    if (problem == NULL) return;
+    printf("%s[%d] %s\n", solved_marker(problem->problem_id), problem->problem_id, problem->title);
+    printf("     난이도: %d | 카테고리: %s\n", problem->difficulty, problem->category);
+    printf("     정답률: %.2f%% | 제출: %d\n", get_problem_correct_rate(problem), problem->submit_count);
+}
+
+static int result_contains_problem_id(const Problem* arr, int count, int problem_id) {
+    for (int i = 0; i < count; i++) {
+        if (arr[i].problem_id == problem_id) return 1;
+    }
+    return 0;
+}
+
+static int paginate_problem_results(Problem* arr, int count, const char* title) {
+    if (count <= 0) {
+        printf("검색 결과가 없습니다.\n");
+        return 0;
+    }
+
+    int page = 0;
+    int total_pages = (count + PROBLEM_PAGE_SIZE - 1) / PROBLEM_PAGE_SIZE;
+    char cmd[64];
+
+    while (1) {
+        clear_screen();
+        print_separator();
+        printf("%s\n", title ? title : "문제 목록");
+        printf("페이지 %d / %d | 총 %d문제\n", page + 1, total_pages, count);
+        print_separator();
+
+        int begin = page * PROBLEM_PAGE_SIZE;
+        int end = begin + PROBLEM_PAGE_SIZE;
+        if (end > count) end = count;
+
+        for (int i = begin; i < end; i++) {
+            print_problem_summary(&arr[i]);
+            if (i != end - 1) printf("\n");
+        }
+
+        print_separator();
+        printf("문제 ID 입력: 상세 보기 | n: 다음 페이지 | p: 이전 페이지 | 0: 뒤로\n");
+        printf("선택 > ");
+
+        if (fgets(cmd, sizeof(cmd), stdin) == NULL) return 0;
+        trim_newline(cmd);
+
+        if (strcmp(cmd, "0") == 0 || strcmp(cmd, "q") == 0 || strcmp(cmd, "Q") == 0) {
+            return 0;
+        }
+        if (strcmp(cmd, "n") == 0 || strcmp(cmd, "N") == 0) {
+            if (page + 1 < total_pages) page++;
+            else {
+                printf("마지막 페이지입니다.\n");
+                press_enter_to_continue();
+            }
+            continue;
+        }
+        if (strcmp(cmd, "p") == 0 || strcmp(cmd, "P") == 0) {
+            if (page > 0) page--;
+            else {
+                printf("첫 페이지입니다.\n");
+                press_enter_to_continue();
+            }
+            continue;
+        }
+
+        char* endptr = NULL;
+        long id = strtol(cmd, &endptr, 10);
+        if (endptr != cmd && *endptr == '\0') {
+            if (result_contains_problem_id(arr, count, (int)id)) return (int)id;
+            printf("현재 결과 목록에 없는 문제 ID입니다.\n");
+            press_enter_to_continue();
+            continue;
+        }
+
+        printf("잘못된 입력입니다. 문제 ID, n, p, 0 중 하나를 입력하세요.\n");
+        press_enter_to_continue();
+    }
+}
+
+int list_problems(int sort_by_difficulty) {
     if (g_problem_count == 0) {
         printf("등록된 문제가 없습니다.\n");
-        return;
+        press_enter_to_continue();
+        return 0;
     }
 
     Problem* tmp = (Problem*)malloc(sizeof(Problem) * (size_t)g_problem_count);
     if (tmp == NULL) {
         printf("[오류] 메모리 할당 실패.\n");
-        return;
+        press_enter_to_continue();
+        return 0;
     }
 
     memcpy(tmp, g_problems, sizeof(Problem) * (size_t)g_problem_count);
     qsort(tmp, (size_t)g_problem_count, sizeof(Problem),
           sort_by_difficulty ? compare_problem_difficulty : compare_problem_id);
 
-    print_separator();
-    printf("문제 목록\n");
-    print_separator();
-
-    for (int i = 0; i < g_problem_count; i++) {
-        printf("%s[%d] %s\n", solved_marker(tmp[i].problem_id), tmp[i].problem_id, tmp[i].title);
-        printf("     난이도: %d | 카테고리: %s\n",
-               tmp[i].difficulty, tmp[i].category);
-        printf("     정답률: %.2f%% | 제출: %d\n",
-               get_problem_correct_rate(&tmp[i]), tmp[i].submit_count);
-
-        if (i != g_problem_count - 1) {
-            printf("\n");
-        }
-    }
-
-    print_separator();
+    int selected = paginate_problem_results(tmp, g_problem_count,
+                                            sort_by_difficulty ? "문제 목록 - 난이도순" : "문제 목록 - ID순");
     free(tmp);
+    return selected;
 }
 
-void search_problem_by_title(const char* keyword) {
-    if (keyword == NULL) return;
-    int found = 0;
+int search_problem_by_title(const char* keyword) {
+    if (keyword == NULL) return 0;
+
+    Problem* results = (Problem*)malloc(sizeof(Problem) * (size_t)g_problem_count);
+    if (results == NULL) {
+        printf("[오류] 메모리 할당 실패.\n");
+        press_enter_to_continue();
+        return 0;
+    }
+
+    int count = 0;
     for (int i = 0; i < g_problem_count; i++) {
         if (strstr(g_problems[i].title, keyword) != NULL) {
-            if (!found) {
-                print_separator();
-                printf("검색 결과\n");
-                print_separator();
-            }
-            printf("%s[%d] %s (난이도 %d, %s)\n", solved_marker(g_problems[i].problem_id),
-                   g_problems[i].problem_id, g_problems[i].title, g_problems[i].difficulty, g_problems[i].category);
-            found = 1;
+            results[count++] = g_problems[i];
         }
     }
-    if (!found) printf("검색 결과가 없습니다.\n");
+
+    int selected = paginate_problem_results(results, count, "제목 검색 결과");
+    free(results);
+    return selected;
 }
 
-void search_problem_by_category(const char* category) {
-    if (category == NULL) return;
-    int found = 0;
+int search_problem_by_category(const char* category) {
+    if (category == NULL) return 0;
+
+    Problem* results = (Problem*)malloc(sizeof(Problem) * (size_t)g_problem_count);
+    if (results == NULL) {
+        printf("[오류] 메모리 할당 실패.\n");
+        press_enter_to_continue();
+        return 0;
+    }
+
+    int count = 0;
     for (int i = 0; i < g_problem_count; i++) {
         if (strstr(g_problems[i].category, category) != NULL) {
-            if (!found) {
-                print_separator();
-                printf("검색 결과\n");
-                print_separator();
-            }
-            printf("%s[%d] %s (난이도 %d, %s)\n", solved_marker(g_problems[i].problem_id),
-                   g_problems[i].problem_id, g_problems[i].title, g_problems[i].difficulty, g_problems[i].category);
-            found = 1;
+            results[count++] = g_problems[i];
         }
     }
-    if (!found) printf("검색 결과가 없습니다.\n");
+
+    int selected = paginate_problem_results(results, count, "카테고리 검색 결과");
+    free(results);
+    return selected;
 }
 
 void print_problem_detail(const Problem* problem) {

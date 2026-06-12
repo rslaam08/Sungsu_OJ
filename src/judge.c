@@ -186,6 +186,10 @@ int submit_source(User* user, int problem_id, const char* source_file) {
                 printf("획득 점수: %d점\n", score_earned);
             }
         }
+
+        if (user->tier < TIER_CHALLENGER && check_promotion_condition(user)) {
+            printf("[알림] 승급전 진행 가능! 메인 메뉴의 승급전 메뉴에서 시작할 수 있습니다.\n");
+        }
     } else if (result == JUDGE_CE) {
         printf("컴파일 오류 로그: %s/sub_%d_compile.txt\n", DIR_ERRORS, submission_id);
     }
@@ -195,18 +199,30 @@ int submit_source(User* user, int problem_id, const char* source_file) {
 
 void print_submission_history(int user_id) {
     int found = 0;
+    char buf[64];
     print_separator();
-    printf("%-6s %-8s %-25s %-8s %-8s %-20s\n", "제출ID", "문제ID", "결과", "시간", "점수", "시각");
+    print_padded_utf8("제출ID", 8);
+    print_padded_utf8("문제ID", 8);
+    print_padded_utf8("결과", 27);
+    print_padded_utf8("시간", 8);
+    print_padded_utf8("점수", 8);
+    print_padded_utf8("시각", 20);
+    printf("\n");
     print_separator();
+
     for (int i = 0; i < g_submission_count; i++) {
         if (g_submissions[i].user_id == user_id) {
-            printf("%-6d %-8d %-25s %-8d %-8d %-20s\n",
-                   g_submissions[i].submission_id,
-                   g_submissions[i].problem_id,
-                   judge_result_code_to_display(g_submissions[i].result),
-                   g_submissions[i].time_taken,
-                   g_submissions[i].score_earned,
-                   g_submissions[i].timestamp);
+            snprintf(buf, sizeof(buf), "%d", g_submissions[i].submission_id);
+            print_padded_utf8(buf, 8);
+            snprintf(buf, sizeof(buf), "%d", g_submissions[i].problem_id);
+            print_padded_utf8(buf, 8);
+            print_padded_utf8(judge_result_code_to_display(g_submissions[i].result), 27);
+            snprintf(buf, sizeof(buf), "%d", g_submissions[i].time_taken);
+            print_padded_utf8(buf, 8);
+            snprintf(buf, sizeof(buf), "%d", g_submissions[i].score_earned);
+            print_padded_utf8(buf, 8);
+            print_padded_utf8(g_submissions[i].timestamp, 20);
+            printf("\n");
             found = 1;
         }
     }

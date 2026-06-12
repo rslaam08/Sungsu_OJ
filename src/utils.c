@@ -99,6 +99,38 @@ void print_separator(void) {
     printf("------------------------------------------------------------\n");
 }
 
+int utf8_display_width(const char* s) {
+    if (s == NULL) return 0;
+    int width = 0;
+    const unsigned char* p = (const unsigned char*)s;
+    while (*p) {
+        if (*p < 0x80) {
+            width += 1;
+            p += 1;
+        } else if ((*p & 0xE0) == 0xC0 && p[1]) {
+            width += 2;
+            p += 2;
+        } else if ((*p & 0xF0) == 0xE0 && p[1] && p[2]) {
+            width += 2;
+            p += 3;
+        } else if ((*p & 0xF8) == 0xF0 && p[1] && p[2] && p[3]) {
+            width += 2;
+            p += 4;
+        } else {
+            width += 1;
+            p += 1;
+        }
+    }
+    return width;
+}
+
+void print_padded_utf8(const char* s, int width) {
+    if (s == NULL) s = "";
+    printf("%s", s);
+    int pad = width - utf8_display_width(s);
+    while (pad-- > 0) putchar(' ');
+}
+
 void press_enter_to_continue(void) {
     printf("\nEnter 키를 누르면 계속합니다...");
     fflush(stdout);
