@@ -222,7 +222,7 @@ void  print_user_profile(const User* user);
 int   update_user_score(User* user, int delta_score);
 int   update_tier(User* user);
 
-/* problem.c */
+/* problem.c *//*test*/
 int      add_problem(const char* title, const char* desc,
                      const char* input_desc, const char* output_desc,
                      int difficulty, const char* category,
